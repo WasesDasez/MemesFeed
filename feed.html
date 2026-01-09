@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meme Uploader — Feed</title>
+    <link rel="stylesheet" href="feed.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <button class="pill active" id="btnFeed" type="button">FEED</button>
+      <button class="pill" id="btnCreate" type="button">CREATE</button>
+    </header>
+
+    <main class="page">
+      <!-- Скроллится только лента -->
+      <section class="feed" id="feed"></section>
+
+      <div class="empty" id="emptyState">
+        No memes yet. Go to CREATE and publish one 🙂
+      </div>
+    </main>
+
+    <script src="feed.js"></script>
+  </body>
+</html>
