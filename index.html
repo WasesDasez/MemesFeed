@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meme Uploader — Create</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Top nav -->
+    <header class="topbar">
+      <button class="pill" id="btnFeed" type="button">FEED</button>
+      <button class="pill active" id="btnCreate" type="button">CREATE</button>
+    </header>
+
+    <main class="page">
+      <section class="grid">
+        <!-- LEFT: picture -->
+        <div class="card">
+          <div
+            class="dropzone"
+            id="pictureZone"
+            role="button"
+            tabindex="0"
+            aria-label="Click to upload picture"
+          >
+            <div class="zoneHint" id="pictureHint">Click to upload picture</div>
+            <img id="picturePreview" alt="Preview" />
+          </div>
+          <button class="action blue" id="publishPicture" type="button">
+            Publish your picture
+          </button>
+
+          <!-- hidden file input -->
+          <input id="pictureInput" type="file" accept="image/*" hidden />
+          <p class="help" id="pictureHelp">Max file size: 5 MB</p>
+        </div>
+
+        <!-- CENTER: title -->
+        <div class="center">
+          <h1 class="title">Meme<br />uploader</h1>
+          <p class="subtitle">
+            Upload your picture and text. We save result locally (for Feed
+            page).
+          </p>
+          <p class="footnote">
+            Start page — Create. Feed button opens feed.html.
+          </p>
+        </div>
+
+        <!-- RIGHT: text -->
+        <div class="card">
+          <div
+            class="dropzone"
+            id="textZone"
+            role="button"
+            tabindex="0"
+            aria-label="Click to upload text"
+          >
+            <div class="zoneHint" id="textHint">Click to upload text</div>
+            <div class="textPreview" id="textPreview"></div>
+          </div>
+          <button class="action red" id="publishText" type="button">
+            Publish your text
+          </button>
+          <p class="help" id="textHelp">Max: 10 lines</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal for text input -->
+    <div class="modal" id="textModal" aria-hidden="true">
+      <div
+        class="modalCard"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalTitle"
+      >
+        <h2 id="modalTitle">Enter meme text</h2>
+        <p class="modalHint">Max 10 lines. New line = Enter.</p>
+
+        <textarea
+          id="textArea"
+          rows="8"
+          placeholder="Type your text..."
+        ></textarea>
+        <div class="modalRow">
+          <div class="error" id="textError"></div>
+          <div class="modalBtns">
+            <button class="pill" id="cancelText" type="button">Cancel</button>
+            <button class="pill active" id="saveText" type="button">
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
