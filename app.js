@@ -77,6 +77,7 @@ function initFeed() {
           img.className = "postImg";
           img.alt = "Meme image";
           img.src = meme.imageUrl;
+          
 
           imgWrap.appendChild(img);
           post.appendChild(imgWrap);
@@ -309,3 +310,4 @@ function initCreate() {
 // ---------- boot ----------
 if (isFeedPage()) initFeed();
 if (isCreatePage()) initCreate();
+
