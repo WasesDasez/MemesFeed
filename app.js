@@ -1,5 +1,4 @@
-// app.js  (один файл для CREATE и FEED)
-// Подключи его и на index.html, и на feed.html как type="module" (ниже покажу)
+// app.js  (one file for CREATE + FEED)
 
 import { db, storage } from "./firebase.js";
 import {
@@ -9,6 +8,8 @@ import {
   query,
   orderBy,
   onSnapshot,
+  deleteDoc,
+  doc,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
   ref,
@@ -52,14 +53,26 @@ function initFeed() {
       }
       emptyEl.style.display = "none";
 
-      snap.forEach((doc) => {
-        const meme = doc.data();
+      snap.forEach((docSnap) => {
+        const meme = docSnap.data();
+
+        const hasText = !!(meme.text && String(meme.text).trim());
+        const hasImg = !!(meme.imageUrl && String(meme.imageUrl).trim());
+
+        // If post is fully empty -> delete from Firestore and skip render
+        if (!hasText && !hasImg) {
+          deleteDoc(doc(db, MEMES_COL, docSnap.id));
+          return;
+        }
 
         const post = document.createElement("article");
         post.className = "post";
 
+        post.classList.add("enter");
+        requestAnimationFrame(() => post.classList.remove("enter"));
+
+
         // Text
-        const hasText = !!(meme.text && String(meme.text).trim());
         if (hasText) {
           const text = document.createElement("p");
           text.className = "postText";
@@ -68,7 +81,6 @@ function initFeed() {
         }
 
         // Image
-        const hasImg = !!(meme.imageUrl && String(meme.imageUrl).trim());
         if (hasImg) {
           const imgWrap = document.createElement("div");
           imgWrap.className = "imgWrap";
@@ -77,7 +89,9 @@ function initFeed() {
           img.className = "postImg";
           img.alt = "Meme image";
           img.src = meme.imageUrl;
-          
+
+          // If image missing/deleted -> remove the image area
+          img.onerror = () => imgWrap.remove();
 
           imgWrap.appendChild(img);
           post.appendChild(imgWrap);
@@ -88,7 +102,6 @@ function initFeed() {
         meta.className = "meta";
         try {
           const ts = meme.createdAt;
-          // Firestore Timestamp -> Date
           const d = ts?.toDate ? ts.toDate() : null;
           meta.textContent = d ? d.toLocaleString() : "";
         } catch {
@@ -165,7 +178,7 @@ function initCreate() {
       if (textHint) textHint.style.display = "none";
     } else {
       textPreview.textContent = "";
-      textPreview.style.display = "block"; // оставляем место как у тебя в визуале
+      textPreview.style.display = "block"; // keep your visual spacing
       if (textHint) textHint.style.display = "block";
     }
 
@@ -175,14 +188,22 @@ function initCreate() {
   function openTextModal() {
     textError.textContent = "";
     textArea.value = state.text || "";
-    textModal.classList.add("open"); // твой CSS ждёт .modal.open
+    textModal.classList.add("open");
     textModal.setAttribute("aria-hidden", "false");
     setTimeout(() => textArea.focus(), 0);
   }
 
   function closeTextModal() {
+    // Fix aria-hidden warning: blur focused element inside modal
+    if (textModal.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+
     textModal.classList.remove("open");
     textModal.setAttribute("aria-hidden", "true");
+
+    // Return focus to the text zone
+    setTimeout(() => textZone?.focus?.(), 0);
   }
 
   function validateText(txt) {
@@ -196,7 +217,7 @@ function initCreate() {
 
     const file = state.imageFile;
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-    const path = `memes/${Date.now()}_${safeName}`;
+    const path = `memes/${Date.now()}_${safeName}`; // no-auth path
 
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, file);
@@ -204,7 +225,6 @@ function initCreate() {
   }
 
   async function publishMeme() {
-    // Валидации
     const txt = state.text || "";
     const err = validateText(txt);
     if (err) {
@@ -213,14 +233,12 @@ function initCreate() {
       return;
     }
 
-    // Publish
     try {
       if (publishPicture) publishPicture.disabled = true;
       if (publishText) publishText.disabled = true;
 
       const imageUrl = await uploadImageIfAny();
 
-      // Если вообще пусто — не публикуем
       if (!imageUrl && !txt.trim()) return;
 
       await addDoc(collection(db, MEMES_COL), {
@@ -229,12 +247,9 @@ function initCreate() {
         createdAt: serverTimestamp(),
       });
 
-      // Очистка формы
       state.imageFile = null;
       state.text = "";
       renderCreate();
-      // Можно отправлять на ленту сразу:
-      // location.href = "feed.html";
     } catch (e) {
       console.error("Publish error:", e);
       alert("Publish error. Check console + Firebase rules/bucket.");
@@ -310,4 +325,3 @@ function initCreate() {
 // ---------- boot ----------
 if (isFeedPage()) initFeed();
 if (isCreatePage()) initCreate();
-
