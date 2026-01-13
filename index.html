@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Meme Uploader — Create</title>
     <link rel="stylesheet" href="style.css" />
-    
   </head>
   <body>
     <!-- Top nav -->
@@ -34,7 +33,7 @@
 
           <!-- hidden file input -->
           <input id="pictureInput" type="file" accept="image/*" hidden />
-          <p class="help" id="pictureHelp">Max file size: 5 MB</p>
+          <p class="help" id="pictureHelp">Max file size: 15 MB</p>
         </div>
 
         <!-- CENTER: title -->
@@ -64,7 +63,7 @@
           <button class="action red" id="publishText" type="button">
             Publish your text
           </button>
-          <p class="help" id="textHelp">Max: 10 lines</p>
+          <p class="help" id="textHelp">Max: 10 lines / 500 chars</p>
         </div>
       </section>
     </main>
@@ -78,7 +77,9 @@
         aria-labelledby="modalTitle"
       >
         <h2 id="modalTitle">Enter meme text</h2>
-        <p class="modalHint">Max 10 lines. New line = Enter.</p>
+        <p class="modalHint">
+          Max 10 lines and 500 characters. New line = Enter.
+        </p>
 
         <textarea
           id="textArea"

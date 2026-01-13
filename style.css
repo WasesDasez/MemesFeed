@@ -23,7 +23,7 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0);
   pointer-events: none;
 }
 
@@ -83,10 +83,10 @@ body::before {
 }
 
 .card:first-child .dropzone {
-  border-color: #1b43ff;
+  border-color: #002fff;
 }
 .card:last-child .dropzone {
-  border-color: #ff2a2a;
+  border-color: #ff0000;
 }
 
 .zoneHint {
@@ -132,13 +132,13 @@ body::before {
 }
 
 .action.blue {
-  background: #1b43ff;
+  background: #002fff;
 }
 .action.red {
-  background: #ff2a2a;
+  background: #ff0000;
 }
 .action:disabled {
-  opacity: 0.55;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -153,12 +153,13 @@ body::before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  margin-top: 34px;
+  gap: 15px;
+  margin-top: 0px;
 }
 
 .title {
-  margin: 0;
+  translate: 0px -90px;
+  margin: 0px 0px 175px 0px;
   font-size: 56px;
   line-height: 1.05;
   font-weight: 900;
