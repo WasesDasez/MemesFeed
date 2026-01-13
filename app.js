@@ -1,7 +1,7 @@
-// app.js  (один файл для CREATE и FEED)
-// Подключи его и на index.html, и на feed.html как type="module" (ниже покажу)
+// app.js (CREATE + FEED)
 
 import { db, storage } from "./firebase.js";
+
 import {
   collection,
   addDoc,
@@ -9,15 +9,44 @@ import {
   query,
   orderBy,
   onSnapshot,
+  deleteDoc,
+  doc,
+  updateDoc,
+  increment,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
 import {
   ref,
   uploadBytes,
   getDownloadURL,
+  deleteObject,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const MEMES_COL = "memes";
-const MAX_FILE_MB = 5;
+const MAX_FILE_MB = 15;
+
+// --- Local reaction storage (no-auth) ---
+const REACTIONS_KEY = "meme_reactions_v1"; // { [postId]: "like" | "dislike" }
+function readReactions() {
+  try {
+    return JSON.parse(localStorage.getItem(REACTIONS_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+function writeReactions(obj) {
+  localStorage.setItem(REACTIONS_KEY, JSON.stringify(obj || {}));
+}
+function getMyReaction(postId) {
+  const map = readReactions();
+  return map[postId] || null;
+}
+function setMyReaction(postId, value /* "like" | "dislike" | null */) {
+  const map = readReactions();
+  if (!value) delete map[postId];
+  else map[postId] = value;
+  writeReactions(map);
+}
 
 function $(id) {
   return document.getElementById(id);
@@ -37,7 +66,8 @@ function initFeed() {
   const emptyEl = $("emptyState");
   const btnCreate = $("btnCreate");
 
-  if (btnCreate) btnCreate.addEventListener("click", () => (location.href = "index.html"));
+  if (btnCreate)
+    btnCreate.addEventListener("click", () => (location.href = "index.html"));
 
   const q = query(collection(db, MEMES_COL), orderBy("createdAt", "desc"));
 
@@ -52,13 +82,61 @@ function initFeed() {
       }
       emptyEl.style.display = "none";
 
-      snap.forEach((doc) => {
-        const meme = doc.data();
+      snap.forEach((docSnap) => {
+        const meme = docSnap.data();
+        const postId = docSnap.id;
 
         const post = document.createElement("article");
         post.className = "post";
 
-        // Text
+        // HEADER: meta left, delete right
+        const header = document.createElement("div");
+        header.className = "postHeader";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        try {
+          const ts = meme.createdAt;
+          const d = ts?.toDate ? ts.toDate() : null;
+          meta.textContent = d ? d.toLocaleString() : "";
+        } catch {
+          meta.textContent = "";
+        }
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "deleteBtn";
+        delBtn.type = "button";
+        delBtn.textContent = "Delete";
+
+        delBtn.addEventListener("click", async () => {
+          if (!confirm("Delete this post?")) return;
+
+          try {
+            delBtn.disabled = true;
+
+            // delete doc
+            await deleteDoc(doc(db, MEMES_COL, postId));
+
+            // delete file if exists
+            if (meme.imagePath && String(meme.imagePath).trim()) {
+              await deleteObject(ref(storage, meme.imagePath));
+            }
+
+            // очистим локальную реакцию на удалённый пост (не обязательно, но приятно)
+            setMyReaction(postId, null);
+          } catch (e) {
+            console.error("Delete error:", e);
+            alert("Delete error. Check console + Firebase rules.");
+          } finally {
+            delBtn.disabled = false;
+          }
+        });
+
+        header.appendChild(meta);
+        header.appendChild(delBtn);
+        post.appendChild(header);
+
+        // TEXT
         const hasText = !!(meme.text && String(meme.text).trim());
         if (hasText) {
           const text = document.createElement("p");
@@ -67,7 +145,7 @@ function initFeed() {
           post.appendChild(text);
         }
 
-        // Image
+        // IMAGE
         const hasImg = !!(meme.imageUrl && String(meme.imageUrl).trim());
         if (hasImg) {
           const imgWrap = document.createElement("div");
@@ -77,24 +155,87 @@ function initFeed() {
           img.className = "postImg";
           img.alt = "Meme image";
           img.src = meme.imageUrl;
-          
 
           imgWrap.appendChild(img);
           post.appendChild(imgWrap);
         }
 
-        // Meta time
-        const meta = document.createElement("div");
-        meta.className = "meta";
-        try {
-          const ts = meme.createdAt;
-          // Firestore Timestamp -> Date
-          const d = ts?.toDate ? ts.toDate() : null;
-          meta.textContent = d ? d.toLocaleString() : "";
-        } catch {
-          meta.textContent = "";
+        // REACTIONS (numeric)
+        const likesCount = Number(meme.likes || 0);
+        const dislikesCount = Number(meme.dislikes || 0);
+        const my = getMyReaction(postId); // "like" | "dislike" | null
+
+        const reactions = document.createElement("div");
+        reactions.className = "reactions";
+
+        const likeBtn = document.createElement("button");
+        likeBtn.className = "reactBtn" + (my === "like" ? " active" : "");
+        likeBtn.type = "button";
+        likeBtn.innerHTML = `👍 <span class="count">${likesCount}</span>`;
+
+        const dislikeBtn = document.createElement("button");
+        dislikeBtn.className = "reactBtn" + (my === "dislike" ? " active" : "");
+        dislikeBtn.type = "button";
+        dislikeBtn.innerHTML = `👎 <span class="count">${dislikesCount}</span>`;
+
+        async function applyReaction(next /* "like" | "dislike" | null */) {
+          const refDoc = doc(db, MEMES_COL, postId);
+
+          // current local reaction
+          const current = getMyReaction(postId);
+
+          // calc increments
+          // current -> next
+          let likeDelta = 0;
+          let dislikeDelta = 0;
+
+          if (current === "like") likeDelta -= 1;
+          if (current === "dislike") dislikeDelta -= 1;
+
+          if (next === "like") likeDelta += 1;
+          if (next === "dislike") dislikeDelta += 1;
+
+          // nothing changes
+          if (likeDelta === 0 && dislikeDelta === 0) return;
+
+          try {
+            likeBtn.disabled = true;
+            dislikeBtn.disabled = true;
+
+            const update = {};
+            if (likeDelta !== 0) update.likes = increment(likeDelta);
+            if (dislikeDelta !== 0) update.dislikes = increment(dislikeDelta);
+
+            await updateDoc(refDoc, update);
+
+            // update local
+            setMyReaction(postId, next);
+          } catch (e) {
+            console.error("Reaction error:", e);
+            alert("Reaction error. Check Firebase rules.");
+          } finally {
+            likeBtn.disabled = false;
+            dislikeBtn.disabled = false;
+          }
         }
-        post.appendChild(meta);
+
+        // Toggle like: like -> null, null -> like, dislike -> like
+        likeBtn.addEventListener("click", () => {
+          const current = getMyReaction(postId);
+          const next = current === "like" ? null : "like";
+          applyReaction(next);
+        });
+
+        // Toggle dislike: dislike -> null, null -> dislike, like -> dislike
+        dislikeBtn.addEventListener("click", () => {
+          const current = getMyReaction(postId);
+          const next = current === "dislike" ? null : "dislike";
+          applyReaction(next);
+        });
+
+        reactions.appendChild(likeBtn);
+        reactions.appendChild(dislikeBtn);
+        post.appendChild(reactions);
 
         feedEl.appendChild(post);
       });
@@ -110,9 +251,9 @@ function initFeed() {
 // ---------- CREATE ----------
 function initCreate() {
   const btnFeed = $("btnFeed");
-  if (btnFeed) btnFeed.addEventListener("click", () => (location.href = "feed.html"));
+  if (btnFeed)
+    btnFeed.addEventListener("click", () => (location.href = "feed.html"));
 
-  // Elements from your index.html
   const pictureZone = $("pictureZone");
   const pictureInput = $("pictureInput");
   const picturePreview = $("picturePreview");
@@ -131,7 +272,7 @@ function initCreate() {
   const textError = $("textError");
 
   const state = {
-    imageFile: null, // File
+    imageFile: null,
     text: "",
   };
 
@@ -142,7 +283,6 @@ function initCreate() {
   }
 
   function renderCreate() {
-    // image preview
     if (state.imageFile) {
       const reader = new FileReader();
       reader.onload = () => {
@@ -157,7 +297,6 @@ function initCreate() {
       if (pictureHint) pictureHint.style.display = "block";
     }
 
-    // text preview
     const hasText = !!state.text.trim();
     if (hasText) {
       textPreview.textContent = state.text;
@@ -165,7 +304,7 @@ function initCreate() {
       if (textHint) textHint.style.display = "none";
     } else {
       textPreview.textContent = "";
-      textPreview.style.display = "block"; // оставляем место как у тебя в визуале
+      textPreview.style.display = "block";
       if (textHint) textHint.style.display = "block";
     }
 
@@ -175,7 +314,7 @@ function initCreate() {
   function openTextModal() {
     textError.textContent = "";
     textArea.value = state.text || "";
-    textModal.classList.add("open"); // твой CSS ждёт .modal.open
+    textModal.classList.add("open");
     textModal.setAttribute("aria-hidden", "false");
     setTimeout(() => textArea.focus(), 0);
   }
@@ -185,9 +324,12 @@ function initCreate() {
     textModal.setAttribute("aria-hidden", "true");
   }
 
+  // 10 lines + 500 chars
   function validateText(txt) {
-    const lines = String(txt || "").split(/\r?\n/);
+    const s = String(txt || "");
+    const lines = s.split(/\r?\n/);
     if (lines.length > 10) return "Max: 10 lines";
+    if (s.length > 500) return "Max: 500 characters";
     return "";
   }
 
@@ -200,11 +342,12 @@ function initCreate() {
 
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
+    const url = await getDownloadURL(storageRef);
+
+    return { url, path };
   }
 
   async function publishMeme() {
-    // Валидации
     const txt = state.text || "";
     const err = validateText(txt);
     if (err) {
@@ -213,28 +356,28 @@ function initCreate() {
       return;
     }
 
-    // Publish
     try {
       if (publishPicture) publishPicture.disabled = true;
       if (publishText) publishText.disabled = true;
 
-      const imageUrl = await uploadImageIfAny();
+      const uploaded = await uploadImageIfAny();
+      const imageUrl = uploaded?.url || "";
+      const imagePath = uploaded?.path || "";
 
-      // Если вообще пусто — не публикуем
       if (!imageUrl && !txt.trim()) return;
 
       await addDoc(collection(db, MEMES_COL), {
         text: txt.trim() ? txt : "",
-        imageUrl: imageUrl || "",
+        imageUrl,
+        imagePath,
+        likes: 0,
+        dislikes: 0,
         createdAt: serverTimestamp(),
       });
 
-      // Очистка формы
       state.imageFile = null;
       state.text = "";
       renderCreate();
-      // Можно отправлять на ленту сразу:
-      // location.href = "feed.html";
     } catch (e) {
       console.error("Publish error:", e);
       alert("Publish error. Check console + Firebase rules/bucket.");
@@ -243,7 +386,6 @@ function initCreate() {
     }
   }
 
-  // Image pick
   function pickImage() {
     pictureInput.click();
   }
@@ -274,7 +416,6 @@ function initCreate() {
     renderCreate();
   });
 
-  // Text modal
   textZone.addEventListener("click", openTextModal);
   textZone.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") openTextModal();
@@ -296,18 +437,16 @@ function initCreate() {
   });
 
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && textModal.classList.contains("open")) closeTextModal();
+    if (e.key === "Escape" && textModal.classList.contains("open"))
+      closeTextModal();
   });
 
-  // Publish buttons
   publishPicture.addEventListener("click", publishMeme);
   publishText.addEventListener("click", publishMeme);
 
-  // Init
   renderCreate();
 }
 
 // ---------- boot ----------
 if (isFeedPage()) initFeed();
 if (isCreatePage()) initCreate();
-
