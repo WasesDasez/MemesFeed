@@ -151,16 +151,15 @@ body::before {
 .center {
   text-align: center;
   display: flex;
-  flex-direction: column;
+  flex-direction:row;
   align-items: center;
   gap: 15px;
   margin-top: 0px;
 }
 
 .title {
-  translate: 0px -90px;
-  margin: 0px 0px 175px 0px;
-  font-size: 56px;
+  margin: 1vh;
+  font-size: 40px;
   line-height: 1.05;
   font-weight: 900;
   text-align: center; /* <- ровно по центру */
@@ -246,8 +245,5 @@ textarea {
   .center {
     height: 100px;
     margin-top: 0;
-  }
-  .title{
-    translate: 30px -865px;
   }
 }
