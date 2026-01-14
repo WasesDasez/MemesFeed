@@ -149,15 +149,17 @@ body::before {
 }
 
 .center {
+  translate: 0px 176px;
   text-align: center;
   display: flex;
-  flex-direction:row;
+  flex-direction: column;
   align-items: center;
   gap: 15px;
   margin-top: 0px;
 }
 
 .title {
+  translate: 0px -250px;
   margin: 1vh;
   font-size: 40px;
   line-height: 1.05;
@@ -243,10 +245,13 @@ textarea {
     gap: 26px;
   }
   .center {
+    translate: 0px 0px;
     height: 100px;
     margin-top: 0;
+    flex-direction: row;
   }
   .title{
+    translate: 0px 0px;
     font-size: 30px;
   }
 }
