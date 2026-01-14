@@ -246,4 +246,7 @@ textarea {
     height: 100px;
     margin-top: 0;
   }
+  .title{
+    font-size: 30px;
+  }
 }
