@@ -149,7 +149,6 @@ body::before {
 }
 
 .center {
-  translate: 0px 176px;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -159,8 +158,8 @@ body::before {
 }
 
 .title {
-  translate: 0px -250px;
-  margin: 1vh;
+  translate: 0px -80px;
+  margin: 0;
   font-size: 40px;
   line-height: 1.05;
   font-weight: 900;
@@ -168,6 +167,7 @@ body::before {
 }
 
 .subtitle {
+  translate: 0px 250px;
   margin: 0;
   max-width: 320px;
   font-size: 14px;
