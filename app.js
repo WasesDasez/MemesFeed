@@ -1,6 +1,6 @@
 // app.js (CREATE + FEED)
 
-import { db, storage } from "./firebase.js";
+import { db, storage, auth } from "./firebase.js";
 
 import {
   collection,
@@ -14,6 +14,14 @@ import {
   updateDoc,
   increment,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 import {
   ref,
@@ -60,6 +68,57 @@ function isCreatePage() {
   return !!$("pictureZone") && !!$("publishPicture");
 }
 
+const provider = new GoogleAuthProvider();
+
+function initAuthUI() {
+  const btnLogin = $("btnLogin");
+  const btnLogout = $("btnLogout");
+  const authName = $("authName");
+
+  async function doPopup() {
+    await signInWithPopup(auth, provider);
+  }
+
+  async function doRedirect() {
+    await signInWithRedirect(auth, provider);
+  }
+
+  btnLogin?.addEventListener("click", async () => {
+    try {
+      // Popup usually works on GitHub Pages, but some browsers block it:
+      await doPopup();
+    } catch (e) {
+      console.warn("Popup failed, trying redirect:", e);
+      await doRedirect();
+    }
+  });
+
+  btnLogout?.addEventListener("click", async () => {
+    await signOut(auth);
+  });
+
+  // for redirect flow
+  getRedirectResult(auth).catch(() => {});
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      if (btnLogin) btnLogin.style.display = "none";
+      if (btnLogout) btnLogout.style.display = "inline-flex";
+      if (authName) {
+        authName.style.display = "inline-flex";
+        authName.textContent = user.displayName || "User";
+      }
+    } else {
+      if (btnLogin) btnLogin.style.display = "inline-flex";
+      if (btnLogout) btnLogout.style.display = "none";
+      if (authName) {
+        authName.style.display = "none";
+        authName.textContent = "";
+      }
+    }
+  });
+}
+
 // ---------- FEED ----------
 function initFeed() {
   const feedEl = $("feed");
@@ -98,7 +157,8 @@ function initFeed() {
         try {
           const ts = meme.createdAt;
           const d = ts?.toDate ? ts.toDate() : null;
-          meta.textContent = d ? d.toLocaleString() : "";
+          const author = meme.ownerName ? `by ${meme.ownerName}` : "";
+          meta.textContent = d ? `${d.toLocaleString()} ${author}` : author;
         } catch {
           meta.textContent = "";
         }
@@ -107,6 +167,13 @@ function initFeed() {
         delBtn.className = "deleteBtn";
         delBtn.type = "button";
         delBtn.textContent = "Delete";
+
+        const isOwner =
+        !!auth.currentUser &&
+        !!meme.ownerUid &&
+        meme.ownerUid === auth.currentUser.uid;
+
+        delBtn.style.display = isOwner ? "inline-flex" : "none";
 
         delBtn.addEventListener("click", async () => {
           if (!confirm("Delete this post?")) return;
@@ -348,6 +415,11 @@ function initCreate() {
   }
 
   async function publishMeme() {
+    if (!auth.currentUser) {
+    alert("Please login first");
+    return;
+  }
+
     const txt = state.text || "";
     const err = validateText(txt);
     if (err) {
@@ -373,6 +445,9 @@ function initCreate() {
         likes: 0,
         dislikes: 0,
         createdAt: serverTimestamp(),
+
+        ownerUid: auth.currentUser.uid,
+        ownerName: auth.currentUser.displayName || "User"
       });
 
       state.imageFile = null;
@@ -448,5 +523,10 @@ function initCreate() {
 }
 
 // ---------- boot ----------
-if (isFeedPage()) initFeed();
-if (isCreatePage()) initCreate();
+initAuthUI();
+
+onAuthStateChanged(auth, () => {
+  // run page logic after auth state is known
+  if (isFeedPage()) initFeed();
+  if (isCreatePage()) initCreate();
+});
