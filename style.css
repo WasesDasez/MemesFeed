@@ -244,6 +244,10 @@ textarea {
     gap: 26px;
   }
   .center {
+    height: 100px;
     margin-top: 0;
+  }
+  .title{
+    translate: 30px -865px;
   }
 }
